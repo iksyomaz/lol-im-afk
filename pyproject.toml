@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lol-im-afk"
+version = "0.1.0"
+description = "Windows tray app that auto-accepts League of Legends ready checks after a random delay."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["league-of-legends", "lcu", "tray", "windows"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Desktop Environment",
+]
+dependencies = [
+  "Pillow>=10.0",
+  "pystray>=0.19",
+  "requests>=2.31",
+]
+
+[project.scripts]
+lol-im-afk = "lol_im_afk.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
