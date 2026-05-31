@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
 
 from lol_im_afk.desktop_ui import DesktopUi
@@ -69,23 +69,17 @@ def _should_notify_event(event: str) -> bool:
 
 def _create_icon_image(enabled: bool) -> Image.Image:
     size = 64
-    image = Image.new("RGBA", (size, size), (22, 22, 22, 255))
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    color = (0, 145, 70, 255) if enabled else (190, 35, 35, 255)
-    text = "AFK" if enabled else "OFF"
-    draw.rounded_rectangle((2, 2, 62, 62), radius=8, fill=color)
-    draw.text(
-        (32, 32),
-        text,
-        fill=(255, 255, 255, 255),
-        font=_icon_font(),
-        anchor="ma",
-    )
+    fill = (0, 170, 85, 255) if enabled else (220, 40, 40, 255)
+
+    draw.ellipse((4, 4, 60, 60), fill=fill)
+    draw.ellipse((4, 4, 60, 60), outline=(255, 255, 255, 230), width=4)
+
+    if enabled:
+        draw.line((19, 33, 28, 43, 46, 22), fill=(255, 255, 255, 255), width=8, joint="curve")
+    else:
+        draw.rounded_rectangle((18, 18, 27, 46), radius=3, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle((37, 18, 46, 46), radius=3, fill=(255, 255, 255, 255))
+
     return image
-
-
-def _icon_font() -> ImageFont.ImageFont:
-    try:
-        return ImageFont.truetype("arialbd.ttf", 20)
-    except OSError:
-        return ImageFont.load_default()
