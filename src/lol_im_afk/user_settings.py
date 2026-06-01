@@ -21,6 +21,7 @@ class UserSettings:
     delay_max_seconds: float = 5.5
     sound_enabled: bool = True
     sound_volume_percent: int = 70
+    icon_theme: str = "status"
 
 
 class SettingsStore:
@@ -54,6 +55,7 @@ class SettingsStore:
             delay_max_seconds=_float_or_default(payload.get("delay_max_seconds"), 5.5),
             sound_enabled=bool(payload.get("sound_enabled", True)),
             sound_volume_percent=_int_or_default(payload.get("sound_volume_percent"), 70),
+            icon_theme=str(payload.get("icon_theme") or "status"),
         )
 
 

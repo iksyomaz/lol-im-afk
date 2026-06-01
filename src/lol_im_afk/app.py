@@ -108,6 +108,11 @@ def run_tray_app(
         status_store=status_store,
     )
     try:
-        run_tray(worker=worker, status_store=status_store, desktop_ui=desktop_ui)
+        run_tray(
+            worker=worker,
+            status_store=status_store,
+            desktop_ui=desktop_ui,
+            settings_store=settings_store,
+        )
     finally:
         desktop_ui.stop()

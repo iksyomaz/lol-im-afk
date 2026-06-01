@@ -15,8 +15,8 @@ You still need to come back for champion select and the game itself.
 ## Features
 
 - Windows tray app with no terminal window.
-- Green `AFK` tray icon when enabled.
-- Red `OFF` tray icon when disabled.
+- High-contrast tray icon that changes between enabled and disabled states.
+- Predefined tray icon themes, including status, AFK runner/seat, and smoke/gamepad.
 - Left-click tray icon to toggle enabled/disabled.
 - Right-click tray icon for settings and quit.
 - Custom bottom-right notifications for:
@@ -60,7 +60,7 @@ This starts the tray app with `pythonw.exe`, so no terminal window has to stay o
 ## Usage
 
 - Left-click the tray icon to toggle auto-accept.
-- Right-click the tray icon and choose `Settings` to adjust delay, sound volume, lockfile path, and logs.
+- Right-click the tray icon and choose `Settings` to adjust delay, tray icon theme, sound volume, lockfile path, and logs.
 - Keep League open and queue normally.
 - When a match is found, the app waits the configured random delay and accepts once.
 - When champion select starts, the app shows another notification.

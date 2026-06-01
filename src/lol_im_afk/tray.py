@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from PIL import Image, ImageDraw
 from pystray import Icon, Menu, MenuItem
 
 from lol_im_afk.desktop_ui import DesktopUi
+from lol_im_afk.icon_theme import create_icon_image
 from lol_im_afk.status import StatusStore
+from lol_im_afk.user_settings import SettingsStore
 from lol_im_afk.worker import AutoAcceptWorker
 
 
@@ -20,8 +21,16 @@ TRAY_NOTIFICATION_EVENTS = (
 )
 
 
-def run_tray(worker: AutoAcceptWorker, status_store: StatusStore, desktop_ui: DesktopUi) -> None:
-    image = _create_icon_image(worker.is_enabled())
+def run_tray(
+    worker: AutoAcceptWorker,
+    status_store: StatusStore,
+    desktop_ui: DesktopUi,
+    settings_store: SettingsStore,
+) -> None:
+    image = create_icon_image(worker.is_enabled(), settings_store.settings.icon_theme)
+
+    def update_icon(icon: Icon) -> None:
+        icon.icon = create_icon_image(worker.is_enabled(), settings_store.settings.icon_theme)
 
     def status_text(_: MenuItem) -> str:
         snapshot = status_store.snapshot()
@@ -30,7 +39,7 @@ def run_tray(worker: AutoAcceptWorker, status_store: StatusStore, desktop_ui: De
 
     def toggle(_: Icon, __: MenuItem) -> None:
         worker.toggle_enabled()
-        _.icon = _create_icon_image(worker.is_enabled())
+        update_icon(_)
 
     def open_settings(_: Icon, __: MenuItem) -> None:
         desktop_ui.open_settings()
@@ -55,6 +64,7 @@ def run_tray(worker: AutoAcceptWorker, status_store: StatusStore, desktop_ui: De
             MenuItem("Quit", quit_app),
         ),
     )
+    desktop_ui.set_icon_theme_changed_callback(lambda: update_icon(icon))
     worker.set_event_callback(lambda event: _notify_event(desktop_ui, event))
     icon.run()
 
@@ -69,20 +79,3 @@ def _notify_event(desktop_ui: DesktopUi, event: str) -> None:
 def _should_notify_event(event: str) -> bool:
     return any(message in event for message in TRAY_NOTIFICATION_EVENTS)
 
-
-def _create_icon_image(enabled: bool) -> Image.Image:
-    size = 64
-    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    fill = (0, 170, 85, 255) if enabled else (220, 40, 40, 255)
-
-    draw.ellipse((4, 4, 60, 60), fill=fill)
-    draw.ellipse((4, 4, 60, 60), outline=(255, 255, 255, 230), width=4)
-
-    if enabled:
-        draw.line((19, 33, 28, 43, 46, 22), fill=(255, 255, 255, 255), width=8, joint="curve")
-    else:
-        draw.rounded_rectangle((18, 18, 27, 46), radius=3, fill=(255, 255, 255, 255))
-        draw.rounded_rectangle((37, 18, 46, 46), radius=3, fill=(255, 255, 255, 255))
-
-    return image
