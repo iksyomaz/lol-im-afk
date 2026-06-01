@@ -9,7 +9,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Callable
 
 from lol_im_afk.config import AppConfig, lockfile_paths_from_setting
-from lol_im_afk.sound import SOUND_PRESETS, SoundPlayer, preset_by_key
+from lol_im_afk.sound import SOUND_CUES, SoundPlayer
 from lol_im_afk.status import StatusStore
 from lol_im_afk.user_settings import SettingsStore
 from lol_im_afk.worker import AutoAcceptWorker
@@ -35,8 +35,8 @@ class DesktopUi:
         self._popups: list[tk.Toplevel] = []
         self._sound_player = SoundPlayer(
             sound_dir=self._config.log_file.parent / "sounds",
-            sound_name=self._settings_store.settings.sound_name,
             enabled=self._settings_store.settings.sound_enabled,
+            volume_percent=self._settings_store.settings.sound_volume_percent,
         )
         self._thread.start()
         self._ready.wait(timeout=5)
@@ -83,7 +83,7 @@ class DesktopUi:
         if self._root is None:
             return
 
-        self._sound_player.play_notification()
+        self._sound_player.play_for_event(message)
 
         popup = tk.Toplevel(self._root)
         popup.overrideredirect(True)
@@ -164,7 +164,8 @@ class DesktopUi:
         delay_min_var = tk.StringVar(value=str(settings.delay_min_seconds))
         delay_max_var = tk.StringVar(value=str(settings.delay_max_seconds))
         sound_enabled_var = tk.BooleanVar(value=settings.sound_enabled)
-        sound_var = tk.StringVar(value=preset_by_key(settings.sound_name).label)
+        sound_volume_var = tk.IntVar(value=settings.sound_volume_percent)
+        preview_cue_var = tk.StringVar(value=SOUND_CUES[0].label)
         status_var = tk.StringVar(value=self._status_store.snapshot().text)
 
         main = ttk.Frame(window, padding=12)
@@ -183,19 +184,26 @@ class DesktopUi:
         ttk.Label(main, text="Delay max").grid(row=2, column=2, sticky="e", pady=(10, 0))
         ttk.Entry(main, textvariable=delay_max_var, width=8).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
 
-        ttk.Label(main, text="Sound").grid(row=3, column=0, sticky="w", pady=(10, 0))
-        sound_labels = [preset.label for preset in SOUND_PRESETS]
-        sound_combo = ttk.Combobox(main, textvariable=sound_var, values=sound_labels, state="readonly")
-        sound_combo.grid(row=3, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
-        ttk.Checkbutton(main, text="Play sound", variable=sound_enabled_var).grid(row=3, column=2, sticky="w", pady=(10, 0))
+        ttk.Label(main, text="Sound volume").grid(row=3, column=0, sticky="w", pady=(10, 0))
+        sound_volume = ttk.Scale(main, from_=0, to=100, variable=sound_volume_var, orient="horizontal")
+        sound_volume.grid(row=3, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
+        volume_label = ttk.Label(main, text=f"{sound_volume_var.get()}%")
+        volume_label.grid(row=3, column=2, sticky="w", pady=(10, 0))
+        sound_volume.configure(command=lambda _: volume_label.configure(text=f"{sound_volume_var.get()}%"))
+
+        ttk.Label(main, text="Preview cue").grid(row=4, column=0, sticky="w", pady=(10, 0))
+        cue_labels = [cue.label for cue in SOUND_CUES]
+        cue_combo = ttk.Combobox(main, textvariable=preview_cue_var, values=cue_labels, state="readonly")
+        cue_combo.grid(row=4, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
+        ttk.Checkbutton(main, text="Play sound", variable=sound_enabled_var).grid(row=4, column=2, sticky="w", pady=(10, 0))
         ttk.Button(
             main,
             text="Preview",
-            command=lambda: self._preview_sound(sound_var.get()),
-        ).grid(row=3, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+            command=lambda: self._preview_sound(preview_cue_var.get(), sound_volume_var.get()),
+        ).grid(row=4, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
 
         button_row = ttk.Frame(main)
-        button_row.grid(row=4, column=0, columnspan=4, sticky="ew", pady=(12, 8))
+        button_row.grid(row=5, column=0, columnspan=4, sticky="ew", pady=(12, 8))
         ttk.Button(
             button_row,
             text="Apply",
@@ -203,20 +211,20 @@ class DesktopUi:
                 lockfile_var.get(),
                 delay_min_var.get(),
                 delay_max_var.get(),
-                sound_var.get(),
                 sound_enabled_var.get(),
+                sound_volume_var.get(),
             ),
         ).pack(side="left")
         ttk.Button(button_row, text="Open log file", command=self._open_log_file).pack(side="left", padx=(8, 0))
         ttk.Button(button_row, text="Refresh logs", command=lambda: self._load_logs(log_text)).pack(side="left", padx=(8, 0))
 
-        ttk.Label(main, text="Logs").grid(row=5, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(main, text="Logs").grid(row=6, column=0, sticky="w", pady=(4, 0))
         log_text = scrolledtext.ScrolledText(main, height=16, wrap="word")
-        log_text.grid(row=6, column=0, columnspan=4, sticky="nsew", pady=(4, 0))
+        log_text.grid(row=7, column=0, columnspan=4, sticky="nsew", pady=(4, 0))
         self._load_logs(log_text)
 
         main.columnconfigure(1, weight=1)
-        main.rowconfigure(6, weight=1)
+        main.rowconfigure(7, weight=1)
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
 
@@ -238,16 +246,16 @@ class DesktopUi:
         if dir_path:
             lockfile_var.set(dir_path)
 
-    def _preview_sound(self, label: str) -> None:
-        self._sound_player.preview(self._sound_key_from_label(label))
+    def _preview_sound(self, label: str, volume_percent: int) -> None:
+        self._sound_player.preview(self._cue_key_from_label(label), volume_percent=volume_percent)
 
     def _apply_settings(
         self,
         lockfile_path: str,
         delay_min_raw: str,
         delay_max_raw: str,
-        sound_label: str,
         sound_enabled: bool,
+        sound_volume_percent: int,
     ) -> None:
         try:
             delay_min = float(delay_min_raw)
@@ -262,14 +270,14 @@ class DesktopUi:
         settings.lockfile_path = lockfile_path.strip() or None
         settings.delay_min_seconds = delay_min
         settings.delay_max_seconds = delay_max
-        settings.sound_name = self._sound_key_from_label(sound_label)
         settings.sound_enabled = sound_enabled
+        settings.sound_volume_percent = max(0, min(100, int(sound_volume_percent)))
         self._settings_store.save()
 
         lockfile_paths = lockfile_paths_from_setting(settings.lockfile_path)
         self._worker.update_timing(delay_min, delay_max)
         self._worker.update_lockfile_paths(lockfile_paths)
-        self._sound_player.set_sound(settings.sound_name, settings.sound_enabled)
+        self._sound_player.set_sound(settings.sound_enabled, settings.sound_volume_percent)
         messagebox.showinfo("Settings saved", "Settings applied.")
 
     def _load_logs(self, log_text: scrolledtext.ScrolledText) -> None:
@@ -288,5 +296,5 @@ class DesktopUi:
         self._config.log_file.touch(exist_ok=True)
         os.startfile(str(self._config.log_file))
 
-    def _sound_key_from_label(self, label: str) -> str:
-        return next((preset.key for preset in SOUND_PRESETS if preset.label == label), SOUND_PRESETS[0].key)
+    def _cue_key_from_label(self, label: str) -> str:
+        return next((cue.key for cue in SOUND_CUES if cue.label == label), SOUND_CUES[0].key)

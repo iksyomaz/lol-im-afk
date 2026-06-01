@@ -24,7 +24,8 @@ You still need to come back for champion select and the game itself.
   - match accepted
   - champion select started
   - ready check ended before accept
-- Custom notification sound presets with preview.
+- Stage-aware notification sounds with preview.
+- Default notification sound volume is 70% relative WAV volume, adjustable in Settings.
 - Configurable randomized accept delay.
 - Configurable League lockfile path.
 - Built-in log viewer.
@@ -59,12 +60,29 @@ This starts the tray app with `pythonw.exe`, so no terminal window has to stay o
 ## Usage
 
 - Left-click the tray icon to toggle auto-accept.
-- Right-click the tray icon and choose `Settings` to adjust delay, sound, lockfile path, and logs.
+- Right-click the tray icon and choose `Settings` to adjust delay, sound volume, lockfile path, and logs.
 - Keep League open and queue normally.
 - When a match is found, the app waits the configured random delay and accepts once.
 - When champion select starts, the app shows another notification.
 
 If someone else does not accept, champion select will not start. The app does not retry-spam the League client.
+
+## Sound Cues
+
+The app plays different generated WAV cues for different queue stages:
+
+1. `Queue started`: positive low cue.
+2. `Match found`: higher positive cue.
+3. `Accepted by me`: higher confirmation cue.
+4. `Champion select`: highest positive cue.
+
+Failure states use lower sounds:
+
+- ready check ends before accept: low failure cue
+- ready check fails and queue continues: positive `back in queue` cue
+- ready check fails and lobby returns: lower failure cue
+
+Sound can be turned off or adjusted in Settings. The default volume is `70%`; this controls the generated WAV amplitude and still respects your Windows system volume.
 
 ## CLI Mode
 

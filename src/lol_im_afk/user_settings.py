@@ -19,8 +19,8 @@ class UserSettings:
     lockfile_path: str | None = None
     delay_min_seconds: float = 1.5
     delay_max_seconds: float = 5.5
-    sound_name: str = "soft_ping"
     sound_enabled: bool = True
+    sound_volume_percent: int = 70
 
 
 class SettingsStore:
@@ -52,8 +52,8 @@ class SettingsStore:
             lockfile_path=_optional_string(payload.get("lockfile_path")),
             delay_min_seconds=_float_or_default(payload.get("delay_min_seconds"), 1.5),
             delay_max_seconds=_float_or_default(payload.get("delay_max_seconds"), 5.5),
-            sound_name=str(payload.get("sound_name") or "soft_ping"),
             sound_enabled=bool(payload.get("sound_enabled", True)),
+            sound_volume_percent=_int_or_default(payload.get("sound_volume_percent"), 70),
         )
 
 
@@ -67,5 +67,12 @@ def _optional_string(value: Any) -> str | None:
 def _float_or_default(value: Any, default: float) -> float:
     try:
         return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _int_or_default(value: Any, default: int) -> int:
+    try:
+        return int(value)
     except (TypeError, ValueError):
         return default

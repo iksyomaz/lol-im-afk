@@ -33,6 +33,7 @@ class AutoAcceptWorker:
         self._thread = threading.Thread(target=self._run, name="lol-im-afk-worker", daemon=True)
         self._cooldown_until = 0.0
         self._last_phase: str | None = None
+        self._ready_check_seen = False
 
     def set_event_callback(self, event_callback: Callable[[str], None] | None) -> None:
         self._event_callback = event_callback
@@ -119,8 +120,19 @@ class AutoAcceptWorker:
 
         if phase == "ChampSelect":
             self._emit_event("Champion select started")
-        else:
-            self._emit_event(f"Phase: {phase}")
+            self._ready_check_seen = False
+        elif phase == "Matchmaking":
+            if self._ready_check_seen:
+                self._emit_event("Back in queue; ready check failed")
+            else:
+                self._emit_event("Queue started")
+            self._ready_check_seen = False
+        elif phase in {"Lobby", "None"} and self._ready_check_seen:
+            self._emit_event("Ready check failed; lobby returned")
+            self._ready_check_seen = False
+            self._accepted_current_ready_check = False
+        elif phase == "ReadyCheck":
+            self._ready_check_seen = True
 
     def _accept_after_delay(self) -> None:
         delay = random_accept_delay(
@@ -129,6 +141,7 @@ class AutoAcceptWorker:
         )
         self._status_store.set_text(f"Ready check found; accepting in {delay:.1f}s")
         LOGGER.info("Ready check found; accepting in %.2f seconds", delay)
+        self._ready_check_seen = True
         self._emit_event(f"Match found; accepting in {delay:.1f}s")
 
         if self._sleep(delay):

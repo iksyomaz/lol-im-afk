@@ -9,9 +9,12 @@ from lol_im_afk.worker import AutoAcceptWorker
 
 
 TRAY_NOTIFICATION_EVENTS = (
+    "Queue started",
     "Match found",
     "Accepted match",
     "Champion select started",
+    "Back in queue",
+    "Ready check failed",
     "Ready check ended",
     "Skipped accept",
 )
