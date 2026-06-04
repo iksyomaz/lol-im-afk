@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -88,60 +89,66 @@ class LcuClient:
         self._timeout = request_timeout_seconds
         self._session = requests.Session()
         self._info: LockfileInfo | None = None
+        self._lock = threading.RLock()
 
     def reset(self) -> None:
-        self._info = None
-        self._session = requests.Session()
+        with self._lock:
+            self._info = None
+            self._session.close()
+            self._session = requests.Session()
 
     def set_lockfile_paths(self, lockfile_paths: tuple[Path, ...]) -> None:
-        self._lockfile_paths = lockfile_paths
-        self.reset()
+        with self._lock:
+            self._lockfile_paths = lockfile_paths
+            self.reset()
 
     def connect(self) -> LockfileInfo:
-        lockfile = find_lockfile(self._lockfile_paths)
-        info = parse_lockfile_text(lockfile.read_text(encoding="utf-8"))
-        self._session.auth = HTTPBasicAuth("riot", info.password)
-        self._info = info
-        LOGGER.info("Connected to League client API on port %s", info.port)
-        return info
+        with self._lock:
+            lockfile = find_lockfile(self._lockfile_paths)
+            info = parse_lockfile_text(lockfile.read_text(encoding="utf-8"))
+            self._session.auth = HTTPBasicAuth("riot", info.password)
+            self._info = info
+            LOGGER.info("Connected to League client API on port %s", info.port)
+            return info
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
-        if self._info is None:
-            self.connect()
+        with self._lock:
+            if self._info is None:
+                self.connect()
 
-        assert self._info is not None
-        url = f"{self._info.protocol}://127.0.0.1:{self._info.port}{path}"
+            assert self._info is not None
+            url = f"{self._info.protocol}://127.0.0.1:{self._info.port}{path}"
 
-        try:
-            response = self._session.request(
-                method=method,
-                url=url,
-                timeout=self._timeout,
-                verify=False,
-                **kwargs,
-            )
-        except requests.RequestException as exc:
-            self.reset()
-            raise LcuUnavailableError(str(exc)) from exc
+            try:
+                response = self._session.request(
+                    method=method,
+                    url=url,
+                    timeout=self._timeout,
+                    verify=False,
+                    **kwargs,
+                )
+            except requests.RequestException as exc:
+                self.reset()
+                raise LcuUnavailableError(str(exc)) from exc
 
-        if response.status_code in {401, 403}:
-            self.reset()
-            raise LcuUnavailableError(f"League client authentication failed: {response.status_code}")
+            if response.status_code in {401, 403}:
+                self.reset()
+                raise LcuUnavailableError(f"League client authentication failed: {response.status_code}")
 
-        if response.status_code >= 400:
-            raise LcuApiError(
-                f"League client API returned HTTP {response.status_code} for {path}",
-                status_code=response.status_code,
-            )
+            if response.status_code >= 400:
+                raise LcuApiError(
+                    f"League client API returned HTTP {response.status_code} for {path}",
+                    status_code=response.status_code,
+                )
 
-        if not response.content:
-            return None
+            if not response.content:
+                return None
 
-        content_type = response.headers.get("content-type", "")
-        if "json" not in content_type.lower():
-            return response.text
+            content_type = response.headers.get("content-type", "")
+            if "json" not in content_type.lower():
+                return response.text
 
-        return response.json()
+            return response.json()
 
     def get_gameflow_phase(self) -> str:
         phase = self.request("GET", "/lol-gameflow/v1/gameflow-phase")

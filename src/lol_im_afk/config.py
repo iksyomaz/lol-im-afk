@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,6 +33,16 @@ class AppConfig:
     log_file: Path = field(default_factory=default_log_file)
 
     def validate(self) -> None:
+        for name in (
+            "delay_min_seconds",
+            "delay_max_seconds",
+            "poll_interval_seconds",
+            "reconnect_interval_seconds",
+            "request_timeout_seconds",
+            "accept_cooldown_seconds",
+        ):
+            if not math.isfinite(getattr(self, name)):
+                raise ValueError(f"{name} must be finite")
         if self.delay_min_seconds < 0:
             raise ValueError("delay_min_seconds cannot be negative")
         if self.delay_max_seconds < self.delay_min_seconds:
@@ -42,6 +53,8 @@ class AppConfig:
             raise ValueError("reconnect_interval_seconds must be positive")
         if self.request_timeout_seconds <= 0:
             raise ValueError("request_timeout_seconds must be positive")
+        if self.accept_cooldown_seconds < 0:
+            raise ValueError("accept_cooldown_seconds cannot be negative")
 
 
 def lockfile_paths_from_setting(lockfile_path: str | None) -> tuple[Path, ...]:

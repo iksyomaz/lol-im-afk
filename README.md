@@ -2,7 +2,7 @@
 
 A small Windows tray app for League of Legends queues.
 
-`lol-im-afk` watches the local League client for a ready check, waits a small randomized delay, accepts the match, and shows a notification so you know champion select is starting.
+`lol-im-afk` watches the local League client for a ready check, waits a small randomized delay, accepts the match, and shows notifications as the queue progresses.
 
 It is intentionally narrow: it automates **only match acceptance**. It does **not** pick champions, ban champions, write chat messages, dodge, start queues, interact with gameplay, or automate anything inside champion select.
 
@@ -20,15 +20,18 @@ You still need to come back for champion select and the game itself.
 - Left-click tray icon to toggle enabled/disabled.
 - Right-click tray icon for settings and quit.
 - Custom bottom-right notifications for:
+  - queue started
   - match found
-  - match accepted
+  - match accepted automatically or manually
   - champion select started
-  - ready check ended before accept
+  - ready check failed and returned to queue or lobby
 - Stage-aware notification sounds with preview.
 - Default notification sound volume is 70% relative WAV volume, adjustable in Settings.
 - Configurable randomized accept delay.
 - Configurable League lockfile path.
-- Built-in log viewer.
+- Start with Windows option.
+- Live service status, connection test, notification test, and built-in log viewer.
+- Single-instance protection, rotating logs, and recovery from invalid settings.
 - Foreground CLI mode for diagnostics.
 
 ## Install
@@ -36,10 +39,17 @@ You still need to come back for champion select and the game itself.
 Requirements:
 
 - Windows
-- Python 3.11+
 - League of Legends installed
 
-Clone the repo, create a virtual environment, and install once:
+### Download the EXE
+
+Download `lol-im-afk.exe` from the latest [GitHub Release](https://github.com/iksyomaz/lol-im-afk/releases), run it, and use the tray icon. No terminal or Python installation is required.
+
+Windows may show a SmartScreen warning because this personal project is not code-signed.
+
+### Run from source
+
+Running from source requires Python 3.11+. Clone the repo, create a virtual environment, and install once:
 
 ```powershell
 git clone https://github.com/iksyomaz/lol-im-afk.git
@@ -61,11 +71,13 @@ This starts the tray app with `pythonw.exe`, so no terminal window has to stay o
 
 - Left-click the tray icon to toggle auto-accept.
 - Right-click the tray icon and choose `Settings` to adjust delay, tray icon theme, sound volume, lockfile path, and logs.
+- Enable `Start with Windows` in Settings if desired.
 - Keep League open and queue normally.
 - When a match is found, the app waits the configured random delay and accepts once.
+- If you accept manually before the delay ends, the app detects that and does not send another accept request.
 - When champion select starts, the app shows another notification.
 
-If someone else does not accept, champion select will not start. The app does not retry-spam the League client.
+If someone else does not accept, the app reports whether League returned the lobby to queue or left matchmaking. It does not retry-spam the League client.
 
 ## Sound Cues
 
@@ -78,7 +90,7 @@ The app plays different generated WAV cues for different queue stages:
 
 Failure states use lower sounds:
 
-- ready check ends before accept: low failure cue
+- auto-accept is disabled before the delay completes: low failure cue
 - ready check fails and queue continues: positive `back in queue` cue
 - ready check fails and lobby returns: lower failure cue
 
@@ -96,12 +108,13 @@ CLI mode prints timing events such as match found, accepted, and champion select
 
 ## Build an EXE
 
-Optional:
+From PowerShell:
 
 ```powershell
-pip install pyinstaller
-pyinstaller --noconsole --onefile --name lol-im-afk --paths src src\lol_im_afk\__main__.py
+.\scripts\build-windows.ps1
 ```
+
+The executable is written to `dist\lol-im-afk.exe`. Pushing a `v*` Git tag also runs the GitHub Actions release workflow and attaches the executable to a GitHub Release.
 
 ## What It Uses
 
@@ -158,7 +171,10 @@ That is an implementation stance, not legal advice and not a guarantee. Riot can
 
 ```powershell
 python -m unittest discover -s tests
+python -m compileall -q src tests
 ```
+
+CI runs both checks on Windows with Python 3.11 and 3.12.
 
 ## License
 

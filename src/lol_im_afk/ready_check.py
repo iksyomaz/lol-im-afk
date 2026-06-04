@@ -6,6 +6,7 @@ from typing import Any
 
 READY_CHECK_ACTIVE_STATES = {"inprogress", "in_progress"}
 UNANSWERED_PLAYER_RESPONSES = {"none", "notresponded", "not_responded", ""}
+ACCEPTED_PLAYER_RESPONSES = {"accepted", "accept"}
 
 
 def random_accept_delay(min_seconds: float, max_seconds: float) -> float:
@@ -20,6 +21,13 @@ def should_accept_ready_check(payload: dict[str, Any] | None) -> bool:
     player_response = _normalize(payload.get("playerResponse"))
 
     return state in READY_CHECK_ACTIVE_STATES and player_response in UNANSWERED_PLAYER_RESPONSES
+
+
+def has_player_accepted(payload: dict[str, Any] | None) -> bool:
+    if not payload:
+        return False
+
+    return _normalize(payload.get("playerResponse")) in ACCEPTED_PLAYER_RESPONSES
 
 
 def _normalize(value: Any) -> str:

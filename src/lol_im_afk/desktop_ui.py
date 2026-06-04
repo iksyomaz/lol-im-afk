@@ -9,10 +9,12 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Callable
 
 from lol_im_afk.config import AppConfig, lockfile_paths_from_setting
+from lol_im_afk.events import AppEvent, EventKind
 from lol_im_afk.icon_theme import ICON_THEMES, icon_theme_key_from_label, icon_theme_label_from_key
 from lol_im_afk.sound import SOUND_CUES, SoundPlayer
 from lol_im_afk.status import StatusStore
 from lol_im_afk.user_settings import SettingsStore
+from lol_im_afk.windows_startup import set_start_with_windows
 from lol_im_afk.worker import AutoAcceptWorker
 
 
@@ -43,7 +45,7 @@ class DesktopUi:
         self._thread.start()
         self._ready.wait(timeout=5)
 
-    def notify(self, event: str) -> None:
+    def notify(self, event: AppEvent) -> None:
         self._post(lambda: self._show_popup(event))
 
     def open_settings(self) -> None:
@@ -84,11 +86,11 @@ class DesktopUi:
             self._root = None
             root.destroy()
 
-    def _show_popup(self, message: str) -> None:
+    def _show_popup(self, event: AppEvent) -> None:
         if self._root is None:
             return
 
-        self._sound_player.play_for_event(message)
+        self._sound_player.play_for_event(event)
 
         popup = tk.Toplevel(self._root)
         popup.overrideredirect(True)
@@ -108,7 +110,7 @@ class DesktopUi:
         ).grid(row=0, column=0, sticky="w")
         tk.Label(
             frame,
-            text=message,
+            text=event.display_text,
             wraplength=280,
             justify="left",
             bg="#111827",
@@ -161,8 +163,8 @@ class DesktopUi:
         window = tk.Toplevel(self._root)
         self._settings_window = window
         window.title("lol-im-afk settings")
-        window.geometry("720x560")
-        window.minsize(620, 480)
+        window.geometry("720x620")
+        window.minsize(620, 520)
 
         settings = self._settings_store.settings
         lockfile_var = tk.StringVar(value=settings.lockfile_path or "")
@@ -172,13 +174,23 @@ class DesktopUi:
         sound_volume_var = tk.IntVar(value=settings.sound_volume_percent)
         preview_cue_var = tk.StringVar(value=SOUND_CUES[0].label)
         icon_theme_var = tk.StringVar(value=icon_theme_label_from_key(settings.icon_theme))
+        start_with_windows_var = tk.BooleanVar(value=settings.start_with_windows)
         status_var = tk.StringVar(value=self._status_store.snapshot().text)
 
         main = ttk.Frame(window, padding=12)
         main.pack(fill="both", expand=True)
 
         ttk.Label(main, text="Service").grid(row=0, column=0, sticky="w")
-        ttk.Label(main, textvariable=status_var).grid(row=0, column=1, columnspan=3, sticky="ew", padx=(8, 0))
+        ttk.Label(main, textvariable=status_var).grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 8))
+        ttk.Button(main, text="Test connection", command=self._test_connection).grid(row=0, column=3, sticky="e")
+
+        def refresh_status() -> None:
+            if not window.winfo_exists():
+                return
+            status_var.set(self._status_store.snapshot().text)
+            window.after(1000, refresh_status)
+
+        window.after(1000, refresh_status)
 
         ttk.Label(main, text="Lockfile").grid(row=1, column=0, sticky="w", pady=(10, 0))
         ttk.Entry(main, textvariable=lockfile_var).grid(row=1, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
@@ -199,26 +211,32 @@ class DesktopUi:
         )
         icon_theme_combo.grid(row=3, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
 
-        ttk.Label(main, text="Sound volume").grid(row=4, column=0, sticky="w", pady=(10, 0))
+        ttk.Checkbutton(
+            main,
+            text="Start with Windows",
+            variable=start_with_windows_var,
+        ).grid(row=4, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
+
+        ttk.Label(main, text="Sound volume").grid(row=5, column=0, sticky="w", pady=(10, 0))
         sound_volume = ttk.Scale(main, from_=0, to=100, variable=sound_volume_var, orient="horizontal")
-        sound_volume.grid(row=4, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
+        sound_volume.grid(row=5, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
         volume_label = ttk.Label(main, text=f"{sound_volume_var.get()}%")
-        volume_label.grid(row=4, column=2, sticky="w", pady=(10, 0))
+        volume_label.grid(row=5, column=2, sticky="w", pady=(10, 0))
         sound_volume.configure(command=lambda _: volume_label.configure(text=f"{sound_volume_var.get()}%"))
 
-        ttk.Label(main, text="Preview cue").grid(row=5, column=0, sticky="w", pady=(10, 0))
+        ttk.Label(main, text="Preview cue").grid(row=6, column=0, sticky="w", pady=(10, 0))
         cue_labels = [cue.label for cue in SOUND_CUES]
         cue_combo = ttk.Combobox(main, textvariable=preview_cue_var, values=cue_labels, state="readonly")
-        cue_combo.grid(row=5, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
-        ttk.Checkbutton(main, text="Play sound", variable=sound_enabled_var).grid(row=5, column=2, sticky="w", pady=(10, 0))
+        cue_combo.grid(row=6, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
+        ttk.Checkbutton(main, text="Play sound", variable=sound_enabled_var).grid(row=6, column=2, sticky="w", pady=(10, 0))
         ttk.Button(
             main,
             text="Preview",
             command=lambda: self._preview_sound(preview_cue_var.get(), sound_volume_var.get()),
-        ).grid(row=5, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+        ).grid(row=6, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
 
         button_row = ttk.Frame(main)
-        button_row.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(12, 8))
+        button_row.grid(row=7, column=0, columnspan=4, sticky="ew", pady=(12, 8))
         ttk.Button(
             button_row,
             text="Apply",
@@ -229,18 +247,20 @@ class DesktopUi:
                 sound_enabled_var.get(),
                 sound_volume_var.get(),
                 icon_theme_var.get(),
+                start_with_windows_var.get(),
             ),
         ).pack(side="left")
+        ttk.Button(button_row, text="Test notification", command=self._test_notification).pack(side="left", padx=(8, 0))
         ttk.Button(button_row, text="Open log file", command=self._open_log_file).pack(side="left", padx=(8, 0))
         ttk.Button(button_row, text="Refresh logs", command=lambda: self._load_logs(log_text)).pack(side="left", padx=(8, 0))
 
-        ttk.Label(main, text="Logs").grid(row=7, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(main, text="Logs").grid(row=8, column=0, sticky="w", pady=(4, 0))
         log_text = scrolledtext.ScrolledText(main, height=16, wrap="word")
-        log_text.grid(row=8, column=0, columnspan=4, sticky="nsew", pady=(4, 0))
+        log_text.grid(row=9, column=0, columnspan=4, sticky="nsew", pady=(4, 0))
         self._load_logs(log_text)
 
         main.columnconfigure(1, weight=1)
-        main.rowconfigure(8, weight=1)
+        main.rowconfigure(9, weight=1)
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
 
@@ -265,6 +285,17 @@ class DesktopUi:
     def _preview_sound(self, label: str, volume_percent: int) -> None:
         self._sound_player.preview(self._cue_key_from_label(label), volume_percent=volume_percent)
 
+    def _test_notification(self) -> None:
+        self._show_popup(AppEvent(EventKind.TEST_NOTIFICATION, "Test notification"))
+
+    def _test_connection(self) -> None:
+        try:
+            phase = self._worker.test_connection()
+        except Exception as exc:
+            messagebox.showerror("League connection failed", str(exc))
+            return
+        messagebox.showinfo("League connection works", f"Current gameflow phase: {phase}")
+
     def _apply_settings(
         self,
         lockfile_path: str,
@@ -273,6 +304,7 @@ class DesktopUi:
         sound_enabled: bool,
         sound_volume_percent: int,
         icon_theme_label: str,
+        start_with_windows: bool,
     ) -> None:
         try:
             delay_min = float(delay_min_raw)
@@ -290,10 +322,17 @@ class DesktopUi:
         settings.sound_enabled = sound_enabled
         settings.sound_volume_percent = max(0, min(100, int(sound_volume_percent)))
         settings.icon_theme = icon_theme_key_from_label(icon_theme_label)
+        settings.start_with_windows = start_with_windows
+        try:
+            set_start_with_windows(start_with_windows)
+        except OSError as exc:
+            messagebox.showerror("Startup setting failed", str(exc))
+            return
         self._settings_store.save()
+        settings = self._settings_store.settings
 
         lockfile_paths = lockfile_paths_from_setting(settings.lockfile_path)
-        self._worker.update_timing(delay_min, delay_max)
+        self._worker.update_timing(settings.delay_min_seconds, settings.delay_max_seconds)
         self._worker.update_lockfile_paths(lockfile_paths)
         self._sound_player.set_sound(settings.sound_enabled, settings.sound_volume_percent)
         if self._icon_theme_changed_callback is not None:

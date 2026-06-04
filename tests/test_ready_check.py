@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lol_im_afk.ready_check import random_accept_delay, should_accept_ready_check
+from lol_im_afk.ready_check import has_player_accepted, random_accept_delay, should_accept_ready_check
 
 
 class ReadyCheckDecisionTest(unittest.TestCase):
@@ -19,6 +19,7 @@ class ReadyCheckDecisionTest(unittest.TestCase):
         payload = {"state": "InProgress", "playerResponse": "Accepted"}
 
         self.assertFalse(should_accept_ready_check(payload))
+        self.assertTrue(has_player_accepted(payload))
 
     def test_skips_finished_ready_check(self) -> None:
         payload = {"state": "EveryoneReady", "playerResponse": "None"}

@@ -6,6 +6,7 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+from lol_im_afk.events import AppEvent, EventKind
 
 try:
     import winsound
@@ -38,22 +39,17 @@ def cue_by_key(key: str) -> SoundCue:
     return next((cue for cue in SOUND_CUES if cue.key == key), SOUND_CUES[0])
 
 
-def cue_key_for_event(event: str) -> str:
-    if "Champion select started" in event:
-        return "champ_select"
-    if "Accepted match" in event:
-        return "accepted"
-    if "Match found" in event:
-        return "match_found"
-    if "Back in queue" in event:
-        return "back_in_queue"
-    if "Queue started" in event:
-        return "queue_started"
-    if "lobby returned" in event:
-        return "failed_lobby"
-    if "Ready check ended" in event or "Skipped accept" in event:
-        return "failed"
-    return "queue_started"
+EVENT_CUES: dict[EventKind, str] = {
+    EventKind.QUEUE_STARTED: "queue_started",
+    EventKind.MATCH_FOUND: "match_found",
+    EventKind.ACCEPTED_AUTOMATICALLY: "accepted",
+    EventKind.ACCEPTED_MANUALLY: "accepted",
+    EventKind.CHAMP_SELECT_STARTED: "champ_select",
+    EventKind.BACK_IN_QUEUE: "back_in_queue",
+    EventKind.READY_CHECK_FAILED_LOBBY: "failed_lobby",
+    EventKind.SKIPPED_DISABLED: "failed",
+    EventKind.TEST_NOTIFICATION: "queue_started",
+}
 
 
 class SoundPlayer:
@@ -61,19 +57,23 @@ class SoundPlayer:
         self.sound_dir = sound_dir
         self.enabled = enabled
         self.volume_percent = _clamp_volume(volume_percent)
+        self._cleanup_old_files()
         self.ensure_sound_files()
 
     def set_sound(self, enabled: bool, volume_percent: int) -> None:
         self.enabled = enabled
         self.volume_percent = _clamp_volume(volume_percent)
+        self._cleanup_old_files()
         self.ensure_sound_files()
 
     def preview(self, cue_key: str, volume_percent: int | None = None) -> None:
         self._play(cue_key, volume_percent=volume_percent)
 
-    def play_for_event(self, event: str) -> None:
+    def play_for_event(self, event: AppEvent) -> None:
         if self.enabled:
-            self._play(cue_key_for_event(event))
+            cue_key = EVENT_CUES.get(event.kind)
+            if cue_key is not None:
+                self._play(cue_key)
 
     def ensure_sound_files(self) -> None:
         self.sound_dir.mkdir(parents=True, exist_ok=True)
@@ -99,6 +99,17 @@ class SoundPlayer:
         path = self.path_for(cue_key, volume_percent)
         if not path.is_file():
             _write_cue(path, cue_by_key(cue_key), volume_percent)
+
+    def _cleanup_old_files(self) -> None:
+        if not self.sound_dir.is_dir():
+            return
+        keep_suffix = f"-{self.volume_percent}.wav"
+        for path in self.sound_dir.glob("*.wav"):
+            if not path.name.endswith(keep_suffix):
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
 
 
 def _write_cue(path: Path, cue: SoundCue, volume_percent: int) -> None:

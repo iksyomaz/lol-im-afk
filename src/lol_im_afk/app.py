@@ -5,10 +5,12 @@ import logging
 import sys
 import time
 from collections.abc import Sequence
+from logging.handlers import RotatingFileHandler
 
 from lol_im_afk.config import AppConfig, lockfile_paths_from_setting
 from lol_im_afk.desktop_ui import DesktopUi
 from lol_im_afk.lcu_client import LcuClient
+from lol_im_afk.single_instance import SingleInstance, show_windows_message
 from lol_im_afk.status import StatusStore
 from lol_im_afk.user_settings import SettingsStore
 from lol_im_afk.worker import AutoAcceptWorker
@@ -16,7 +18,14 @@ from lol_im_afk.worker import AutoAcceptWorker
 
 def configure_logging(config: AppConfig, console: bool = False) -> None:
     config.log_file.parent.mkdir(parents=True, exist_ok=True)
-    handlers: list[logging.Handler] = [logging.FileHandler(config.log_file, encoding="utf-8")]
+    handlers: list[logging.Handler] = [
+        RotatingFileHandler(
+            config.log_file,
+            maxBytes=1_000_000,
+            backupCount=3,
+            encoding="utf-8",
+        )
+    ]
     if console:
         handlers.append(logging.StreamHandler())
 
@@ -28,6 +37,18 @@ def configure_logging(config: AppConfig, console: bool = False) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    try:
+        with SingleInstance() as instance:
+            if not instance.acquired:
+                show_windows_message("lol-im-afk", "lol-im-afk is already running.")
+                return
+            _run_main(argv)
+    except Exception as exc:
+        logging.exception("Fatal startup error")
+        show_windows_message("lol-im-afk failed to start", str(exc), error=True)
+
+
+def _run_main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     settings_store = SettingsStore()
     settings = settings_store.settings
@@ -44,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         lockfile_paths=config.lockfile_paths,
         request_timeout_seconds=config.request_timeout_seconds,
     )
-    event_callback = print if args.cli else None
+    event_callback = (lambda event: print(event.display_text)) if args.cli else None
     worker = AutoAcceptWorker(
         config=config,
         lcu_client=lcu_client,

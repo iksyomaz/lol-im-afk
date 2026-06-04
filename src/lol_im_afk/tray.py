@@ -3,22 +3,24 @@ from __future__ import annotations
 from pystray import Icon, Menu, MenuItem
 
 from lol_im_afk.desktop_ui import DesktopUi
+from lol_im_afk.events import AppEvent, EventKind
 from lol_im_afk.icon_theme import create_icon_image
 from lol_im_afk.status import StatusStore
 from lol_im_afk.user_settings import SettingsStore
 from lol_im_afk.worker import AutoAcceptWorker
 
 
-TRAY_NOTIFICATION_EVENTS = (
-    "Queue started",
-    "Match found",
-    "Accepted match",
-    "Champion select started",
-    "Back in queue",
-    "Ready check failed",
-    "Ready check ended",
-    "Skipped accept",
-)
+TRAY_NOTIFICATION_EVENTS = {
+    EventKind.QUEUE_STARTED,
+    EventKind.MATCH_FOUND,
+    EventKind.ACCEPTED_AUTOMATICALLY,
+    EventKind.ACCEPTED_MANUALLY,
+    EventKind.CHAMP_SELECT_STARTED,
+    EventKind.BACK_IN_QUEUE,
+    EventKind.READY_CHECK_FAILED_LOBBY,
+    EventKind.SKIPPED_DISABLED,
+    EventKind.TEST_NOTIFICATION,
+}
 
 
 def run_tray(
@@ -69,13 +71,12 @@ def run_tray(
     icon.run()
 
 
-def _notify_event(desktop_ui: DesktopUi, event: str) -> None:
+def _notify_event(desktop_ui: DesktopUi, event: AppEvent) -> None:
     if not _should_notify_event(event):
         return
 
     desktop_ui.notify(event)
 
 
-def _should_notify_event(event: str) -> bool:
-    return any(message in event for message in TRAY_NOTIFICATION_EVENTS)
-
+def _should_notify_event(event: AppEvent) -> bool:
+    return event.kind in TRAY_NOTIFICATION_EVENTS
