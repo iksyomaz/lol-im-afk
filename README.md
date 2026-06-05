@@ -47,6 +47,8 @@ Download `lol-im-afk.exe` from the latest [GitHub Release](https://github.com/ik
 
 Windows may show a SmartScreen warning because this personal project is not code-signed.
 
+Release notes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
 ### Run from source
 
 Running from source requires Python 3.11+. Clone the repo, create a virtual environment, and install once:
