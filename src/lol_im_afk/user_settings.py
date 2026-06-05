@@ -27,6 +27,7 @@ class UserSettings:
     sound_enabled: bool = True
     sound_volume_percent: int = 70
     icon_theme: str = "status"
+    ui_theme: str = "dark"
     start_with_windows: bool = False
 
 
@@ -68,6 +69,7 @@ class SettingsStore:
                 sound_enabled=_bool_or_default(payload.get("sound_enabled"), True),
                 sound_volume_percent=_int_or_default(payload.get("sound_volume_percent"), 70),
                 icon_theme=str(payload.get("icon_theme") or "status"),
+                ui_theme=str(payload.get("ui_theme") or "dark"),
                 start_with_windows=_bool_or_default(payload.get("start_with_windows"), False),
             )
         )
@@ -96,6 +98,7 @@ def _sanitize_settings(settings: UserSettings) -> UserSettings:
         sound_enabled=bool(settings.sound_enabled),
         sound_volume_percent=max(0, min(100, int(settings.sound_volume_percent))),
         icon_theme=icon_theme_by_key(settings.icon_theme).key,
+        ui_theme=_sanitize_ui_theme(settings.ui_theme),
         start_with_windows=bool(settings.start_with_windows),
     )
 
@@ -125,3 +128,10 @@ def _bool_or_default(value: Any, default: bool) -> bool:
     if isinstance(value, bool):
         return value
     return default
+
+
+def _sanitize_ui_theme(value: Any) -> str:
+    theme = str(value or "").strip().lower()
+    if theme in {"dark", "light"}:
+        return theme
+    return "dark"

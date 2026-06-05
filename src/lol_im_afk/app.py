@@ -37,19 +37,19 @@ def configure_logging(config: AppConfig, console: bool = False) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    args = parse_args(argv)
     try:
         with SingleInstance() as instance:
             if not instance.acquired:
                 show_windows_message("lol-im-afk", "lol-im-afk is already running.")
                 return
-            _run_main(argv)
+            _run_main(args)
     except Exception as exc:
         logging.exception("Fatal startup error")
         show_windows_message("lol-im-afk failed to start", str(exc), error=True)
 
 
-def _run_main(argv: Sequence[str] | None = None) -> None:
-    args = parse_args(argv)
+def _run_main(args: argparse.Namespace) -> None:
     settings_store = SettingsStore()
     settings = settings_store.settings
     config = AppConfig(

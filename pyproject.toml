@@ -24,6 +24,7 @@ dependencies = [
   "Pillow>=10.0",
   "pystray>=0.19",
   "requests>=2.31",
+  "sv-ttk>=2.6.1",
 ]
 
 [project.optional-dependencies]

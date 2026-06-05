@@ -44,6 +44,7 @@ class SettingsStoreTest(unittest.TestCase):
                         "delay_max_seconds": -9,
                         "sound_volume_percent": 140,
                         "icon_theme": "missing",
+                        "ui_theme": "missing",
                     }
                 ),
                 encoding="utf-8",
@@ -55,6 +56,16 @@ class SettingsStoreTest(unittest.TestCase):
             self.assertEqual(settings.delay_max_seconds, 0)
             self.assertEqual(settings.sound_volume_percent, 100)
             self.assertEqual(settings.icon_theme, "status")
+            self.assertEqual(settings.ui_theme, "dark")
+
+    def test_load_accepts_light_ui_theme(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            path.write_text(json.dumps({"ui_theme": "Light"}), encoding="utf-8")
+
+            settings = SettingsStore(path).settings
+
+            self.assertEqual(settings.ui_theme, "light")
 
     def test_save_is_atomic_and_sanitized(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

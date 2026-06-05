@@ -18,7 +18,7 @@ You still need to come back for champion select and the game itself.
 - High-contrast tray icon that changes between enabled and disabled states.
 - Predefined tray icon themes, including status, AFK runner/seat, and smoke/gamepad.
 - Left-click tray icon to toggle enabled/disabled.
-- Right-click tray icon for settings and quit.
+- Right-click tray icon for modern Sun Valley-themed settings and quit.
 - Custom bottom-right notifications for:
   - queue started
   - match found
@@ -29,6 +29,7 @@ You still need to come back for champion select and the game itself.
 - Default notification sound volume is 70% relative WAV volume, adjustable in Settings.
 - Configurable randomized accept delay.
 - Configurable League lockfile path.
+- Dark/light settings UI theme.
 - Start with Windows option.
 - Live service status, connection test, notification test, and built-in log viewer.
 - Single-instance protection, rotating logs, and recovery from invalid settings.
@@ -126,6 +127,7 @@ This app uses:
 - The temporary League `lockfile` to discover the local client port and session token.
 - Local files under `%USERPROFILE%\.lol-im-afk` for settings, logs, and generated notification sounds.
 - Windows desktop APIs through Python libraries for the tray icon, small settings window, popups, and sound playback.
+- The MIT-licensed [Sun Valley ttk theme](https://github.com/rdbende/Sun-Valley-ttk-theme) through `sv-ttk` for the settings window.
 
 This app does not use:
 

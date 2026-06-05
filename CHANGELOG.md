@@ -6,7 +6,15 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+### Added
+
+- Sun Valley ttk theme dependency for a more modern settings window.
+- Dark/light settings UI theme selection.
+
+### Changed
+
+- Reorganized settings into General, Appearance, Sounds, and Logs tabs.
+- Updated the Windows build script to collect `sv_ttk` theme assets for PyInstaller.
 
 ## [0.2.0] - 2026-06-04
 

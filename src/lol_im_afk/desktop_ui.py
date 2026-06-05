@@ -8,6 +8,8 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from typing import Callable
 
+import sv_ttk
+
 from lol_im_afk.config import AppConfig, lockfile_paths_from_setting
 from lol_im_afk.events import AppEvent, EventKind
 from lol_im_afk.icon_theme import ICON_THEMES, icon_theme_key_from_label, icon_theme_label_from_key
@@ -63,6 +65,7 @@ class DesktopUi:
 
     def _run(self) -> None:
         root = tk.Tk()
+        sv_ttk.set_theme(self._settings_store.settings.ui_theme)
         root.withdraw()
         self._root = root
         self._ready.set()
@@ -163,8 +166,8 @@ class DesktopUi:
         window = tk.Toplevel(self._root)
         self._settings_window = window
         window.title("lol-im-afk settings")
-        window.geometry("720x620")
-        window.minsize(620, 520)
+        window.geometry("780x640")
+        window.minsize(700, 560)
 
         settings = self._settings_store.settings
         lockfile_var = tk.StringVar(value=settings.lockfile_path or "")
@@ -174,15 +177,19 @@ class DesktopUi:
         sound_volume_var = tk.IntVar(value=settings.sound_volume_percent)
         preview_cue_var = tk.StringVar(value=SOUND_CUES[0].label)
         icon_theme_var = tk.StringVar(value=icon_theme_label_from_key(settings.icon_theme))
+        ui_theme_var = tk.StringVar(value=settings.ui_theme.title())
         start_with_windows_var = tk.BooleanVar(value=settings.start_with_windows)
         status_var = tk.StringVar(value=self._status_store.snapshot().text)
 
-        main = ttk.Frame(window, padding=12)
+        main = ttk.Frame(window, padding=16)
         main.pack(fill="both", expand=True)
 
-        ttk.Label(main, text="Service").grid(row=0, column=0, sticky="w")
-        ttk.Label(main, textvariable=status_var).grid(row=0, column=1, columnspan=2, sticky="ew", padx=(8, 8))
-        ttk.Button(main, text="Test connection", command=self._test_connection).grid(row=0, column=3, sticky="e")
+        header = ttk.Frame(main)
+        header.grid(row=0, column=0, sticky="ew")
+        ttk.Label(header, text="lol-im-afk", font=("Segoe UI", 16, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(header, textvariable=status_var).grid(row=1, column=0, sticky="w", pady=(2, 0))
+        ttk.Button(header, text="Test connection", command=self._test_connection).grid(row=0, column=1, rowspan=2, sticky="e")
+        header.columnconfigure(0, weight=1)
 
         def refresh_status() -> None:
             if not window.winfo_exists():
@@ -192,51 +199,100 @@ class DesktopUi:
 
         window.after(1000, refresh_status)
 
-        ttk.Label(main, text="Lockfile").grid(row=1, column=0, sticky="w", pady=(10, 0))
-        ttk.Entry(main, textvariable=lockfile_var).grid(row=1, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
-        ttk.Button(main, text="Browse file", command=lambda: self._browse_lockfile(lockfile_var)).grid(row=1, column=2, pady=(10, 0))
-        ttk.Button(main, text="Browse folder", command=lambda: self._browse_lockfile_dir(lockfile_var)).grid(row=1, column=3, padx=(8, 0), pady=(10, 0))
+        notebook = ttk.Notebook(main)
+        notebook.grid(row=1, column=0, sticky="nsew", pady=(14, 0))
 
-        ttk.Label(main, text="Delay min").grid(row=2, column=0, sticky="w", pady=(10, 0))
-        ttk.Entry(main, textvariable=delay_min_var, width=8).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-        ttk.Label(main, text="Delay max").grid(row=2, column=2, sticky="e", pady=(10, 0))
-        ttk.Entry(main, textvariable=delay_max_var, width=8).grid(row=2, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+        general_tab = ttk.Frame(notebook, padding=14)
+        appearance_tab = ttk.Frame(notebook, padding=14)
+        sounds_tab = ttk.Frame(notebook, padding=14)
+        logs_tab = ttk.Frame(notebook, padding=14)
+        notebook.add(general_tab, text="General")
+        notebook.add(appearance_tab, text="Appearance")
+        notebook.add(sounds_tab, text="Sounds")
+        notebook.add(logs_tab, text="Logs")
 
-        ttk.Label(main, text="Tray icon").grid(row=3, column=0, sticky="w", pady=(10, 0))
+        timing_frame = ttk.LabelFrame(general_tab, text="Auto-accept timing", padding=12)
+        timing_frame.grid(row=0, column=0, sticky="ew")
+        ttk.Label(timing_frame, text="Delay min").grid(row=0, column=0, sticky="w")
+        ttk.Entry(timing_frame, textvariable=delay_min_var, width=10).grid(row=0, column=1, sticky="w", padx=(10, 24))
+        ttk.Label(timing_frame, text="Delay max").grid(row=0, column=2, sticky="w")
+        ttk.Entry(timing_frame, textvariable=delay_max_var, width=10).grid(row=0, column=3, sticky="w", padx=(10, 0))
+
+        lockfile_frame = ttk.LabelFrame(general_tab, text="League client", padding=12)
+        lockfile_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        ttk.Label(lockfile_frame, text="Lockfile").grid(row=0, column=0, sticky="w")
+        ttk.Entry(lockfile_frame, textvariable=lockfile_var).grid(row=0, column=1, sticky="ew", padx=(10, 8))
+        ttk.Button(lockfile_frame, text="Browse file", command=lambda: self._browse_lockfile(lockfile_var)).grid(row=0, column=2)
+        ttk.Button(lockfile_frame, text="Browse folder", command=lambda: self._browse_lockfile_dir(lockfile_var)).grid(row=0, column=3, padx=(8, 0))
+        lockfile_frame.columnconfigure(1, weight=1)
+
+        startup_frame = ttk.LabelFrame(general_tab, text="Startup", padding=12)
+        startup_frame.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        ttk.Checkbutton(
+            startup_frame,
+            text="Start with Windows",
+            variable=start_with_windows_var,
+        ).grid(row=0, column=0, sticky="w")
+
+        general_tab.columnconfigure(0, weight=1)
+
+        theme_frame = ttk.LabelFrame(appearance_tab, text="Theme", padding=12)
+        theme_frame.grid(row=0, column=0, sticky="ew")
+        ttk.Label(theme_frame, text="Settings UI").grid(row=0, column=0, sticky="w")
+        ttk.Combobox(
+            theme_frame,
+            textvariable=ui_theme_var,
+            values=("Dark", "Light"),
+            state="readonly",
+            width=14,
+        ).grid(row=0, column=1, sticky="w", padx=(10, 0))
+
+        icon_frame = ttk.LabelFrame(appearance_tab, text="Tray icon", padding=12)
+        icon_frame.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        ttk.Label(icon_frame, text="Icon set").grid(row=0, column=0, sticky="w")
         icon_theme_combo = ttk.Combobox(
-            main,
+            icon_frame,
             textvariable=icon_theme_var,
             values=[theme.label for theme in ICON_THEMES],
             state="readonly",
         )
-        icon_theme_combo.grid(row=3, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
+        icon_theme_combo.grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        icon_frame.columnconfigure(1, weight=1)
+        appearance_tab.columnconfigure(0, weight=1)
 
-        ttk.Checkbutton(
-            main,
-            text="Start with Windows",
-            variable=start_with_windows_var,
-        ).grid(row=4, column=1, sticky="w", padx=(8, 0), pady=(10, 0))
-
-        ttk.Label(main, text="Sound volume").grid(row=5, column=0, sticky="w", pady=(10, 0))
-        sound_volume = ttk.Scale(main, from_=0, to=100, variable=sound_volume_var, orient="horizontal")
-        sound_volume.grid(row=5, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
-        volume_label = ttk.Label(main, text=f"{sound_volume_var.get()}%")
-        volume_label.grid(row=5, column=2, sticky="w", pady=(10, 0))
+        ttk.Label(sounds_tab, text="Sound volume").grid(row=0, column=0, sticky="w")
+        sound_volume = ttk.Scale(sounds_tab, from_=0, to=100, variable=sound_volume_var, orient="horizontal")
+        sound_volume.grid(row=0, column=1, sticky="ew", padx=(10, 8))
+        volume_label = ttk.Label(sounds_tab, text=f"{sound_volume_var.get()}%")
+        volume_label.grid(row=0, column=2, sticky="w")
         sound_volume.configure(command=lambda _: volume_label.configure(text=f"{sound_volume_var.get()}%"))
 
-        ttk.Label(main, text="Preview cue").grid(row=6, column=0, sticky="w", pady=(10, 0))
+        ttk.Checkbutton(sounds_tab, text="Play sound", variable=sound_enabled_var).grid(row=1, column=1, sticky="w", pady=(12, 0))
+        ttk.Label(sounds_tab, text="Preview cue").grid(row=2, column=0, sticky="w", pady=(12, 0))
         cue_labels = [cue.label for cue in SOUND_CUES]
-        cue_combo = ttk.Combobox(main, textvariable=preview_cue_var, values=cue_labels, state="readonly")
-        cue_combo.grid(row=6, column=1, sticky="ew", padx=(8, 8), pady=(10, 0))
-        ttk.Checkbutton(main, text="Play sound", variable=sound_enabled_var).grid(row=6, column=2, sticky="w", pady=(10, 0))
+        cue_combo = ttk.Combobox(sounds_tab, textvariable=preview_cue_var, values=cue_labels, state="readonly")
+        cue_combo.grid(row=2, column=1, sticky="ew", padx=(10, 8), pady=(12, 0))
         ttk.Button(
-            main,
+            sounds_tab,
             text="Preview",
             command=lambda: self._preview_sound(preview_cue_var.get(), sound_volume_var.get()),
-        ).grid(row=6, column=3, sticky="w", padx=(8, 0), pady=(10, 0))
+        ).grid(row=2, column=2, sticky="w", pady=(12, 0))
+        sounds_tab.columnconfigure(1, weight=1)
+
+        log_toolbar = ttk.Frame(logs_tab)
+        log_toolbar.grid(row=0, column=0, sticky="ew")
+        ttk.Button(log_toolbar, text="Test notification", command=self._test_notification).pack(side="left")
+        ttk.Button(log_toolbar, text="Open log file", command=self._open_log_file).pack(side="left", padx=(8, 0))
+        ttk.Button(log_toolbar, text="Refresh logs", command=lambda: self._load_logs(log_text)).pack(side="left", padx=(8, 0))
+        log_text = scrolledtext.ScrolledText(logs_tab, height=16, wrap="word", borderwidth=0, relief="flat")
+        log_text.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        self._style_log_text(log_text)
+        self._load_logs(log_text)
+        logs_tab.columnconfigure(0, weight=1)
+        logs_tab.rowconfigure(1, weight=1)
 
         button_row = ttk.Frame(main)
-        button_row.grid(row=7, column=0, columnspan=4, sticky="ew", pady=(12, 8))
+        button_row.grid(row=2, column=0, sticky="ew", pady=(14, 0))
         ttk.Button(
             button_row,
             text="Apply",
@@ -247,20 +303,14 @@ class DesktopUi:
                 sound_enabled_var.get(),
                 sound_volume_var.get(),
                 icon_theme_var.get(),
+                ui_theme_var.get(),
                 start_with_windows_var.get(),
             ),
         ).pack(side="left")
-        ttk.Button(button_row, text="Test notification", command=self._test_notification).pack(side="left", padx=(8, 0))
-        ttk.Button(button_row, text="Open log file", command=self._open_log_file).pack(side="left", padx=(8, 0))
-        ttk.Button(button_row, text="Refresh logs", command=lambda: self._load_logs(log_text)).pack(side="left", padx=(8, 0))
+        ttk.Button(button_row, text="Close", command=window.destroy).pack(side="right")
 
-        ttk.Label(main, text="Logs").grid(row=8, column=0, sticky="w", pady=(4, 0))
-        log_text = scrolledtext.ScrolledText(main, height=16, wrap="word")
-        log_text.grid(row=9, column=0, columnspan=4, sticky="nsew", pady=(4, 0))
-        self._load_logs(log_text)
-
-        main.columnconfigure(1, weight=1)
-        main.rowconfigure(9, weight=1)
+        main.columnconfigure(0, weight=1)
+        main.rowconfigure(1, weight=1)
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
 
@@ -304,6 +354,7 @@ class DesktopUi:
         sound_enabled: bool,
         sound_volume_percent: int,
         icon_theme_label: str,
+        ui_theme_label: str,
         start_with_windows: bool,
     ) -> None:
         try:
@@ -322,6 +373,7 @@ class DesktopUi:
         settings.sound_enabled = sound_enabled
         settings.sound_volume_percent = max(0, min(100, int(sound_volume_percent)))
         settings.icon_theme = icon_theme_key_from_label(icon_theme_label)
+        settings.ui_theme = ui_theme_label.strip().lower()
         settings.start_with_windows = start_with_windows
         try:
             set_start_with_windows(start_with_windows)
@@ -335,6 +387,7 @@ class DesktopUi:
         self._worker.update_timing(settings.delay_min_seconds, settings.delay_max_seconds)
         self._worker.update_lockfile_paths(lockfile_paths)
         self._sound_player.set_sound(settings.sound_enabled, settings.sound_volume_percent)
+        sv_ttk.set_theme(settings.ui_theme)
         if self._icon_theme_changed_callback is not None:
             self._icon_theme_changed_callback()
         messagebox.showinfo("Settings saved", "Settings applied.")
@@ -349,6 +402,13 @@ class DesktopUi:
             log_text.insert("1.0", "No log file yet.")
         log_text.configure(state="disabled")
         log_text.see("end")
+
+    def _style_log_text(self, log_text: scrolledtext.ScrolledText) -> None:
+        if self._settings_store.settings.ui_theme == "light":
+            log_text.configure(bg="#fafafa", fg="#202020", insertbackground="#202020")
+            return
+
+        log_text.configure(bg="#1c1c1c", fg="#f5f5f5", insertbackground="#f5f5f5")
 
     def _open_log_file(self) -> None:
         self._config.log_file.parent.mkdir(parents=True, exist_ok=True)

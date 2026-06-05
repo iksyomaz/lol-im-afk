@@ -14,6 +14,7 @@ python -m PyInstaller `
     --name lol-im-afk `
     --paths src `
     --hidden-import pystray._win32 `
+    --collect-data sv_ttk `
     src\lol_im_afk\__main__.py
 
 Write-Host "Built dist\lol-im-afk.exe"
